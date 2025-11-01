@@ -14,9 +14,9 @@ public abstract class StatsManager {
 
     public void init() {
         Base.INSTANCE.getScheduler().runTaskAsynchronously(() -> {
-            BuildTypePie.determineBuildType(); // Function to calculate hash
+            //BuildTypePie.determineBuildType(); // Function to calculate hash
             metrics.addCustomChart(new PlayerVersionsPie());
-            metrics.addCustomChart(new BuildTypePie());
+            //metrics.addCustomChart(new BuildTypePie());
             metrics.addCustomChart(new ClientBrandsPie());
         });
     }

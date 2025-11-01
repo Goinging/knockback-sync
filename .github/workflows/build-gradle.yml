@@ -41,17 +41,11 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       # Temporary tasks so built jar works because PacketEvents won't merge my fixes for their broken fabric support
-      - name: Clone Axionize's PacketEvents Repository
+      - name: Clone and Build Axionize's PacketEvents Repository
         run: |
-          git clone -b fix/fabric-events https://github.com/Axionize/packetevents.git packetevents
-          cd packetevents
-          echo "Cloned PacketEvents repository"
-
-      - name: Build and Publish PacketEvents to Maven Local
-        uses: gradle/actions/setup-gradle@v3
-        with:
-          build-root-directory: packetevents
-          arguments: publishToMavenLocal
+          git clone -b fix/fabric-events https://github.com/Axionize/packetevents.git /tmp/packetevents
+          cd /tmp/packetevents
+          ./gradlew publishToMavenLocal -x :bungeecord:build -x :bungeecord:compileJava -x :bungeecord:jar
 
       - name: Update version in build.gradle.kts
         id: update_version
@@ -98,7 +92,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Download the current dev-builds.txt
-          curl -L -o dev-builds.txt https://github.com/${{ github.repository }}/releases/latest/download/dev-builds.txt
+          curl -L -o dev-builds.txt https://github.com/${{ github.repository }}/releases/latest/download/dev-builds.txt || touch dev-builds.txt
           
           # Create a copy of the original file
           cp dev-builds.txt dev-builds.txt.original
@@ -125,12 +119,19 @@ jobs:
             echo "Changes detected in dev-builds.txt, uploading new version."
           
             # Get the latest release ID
-            RELEASE_ID=$(curl -s "https://api.github.com/repos/${{ github.repository }}/releases/latest" | jq -r .id)
+            RELEASE_ID=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+              "https://api.github.com/repos/${{ github.repository }}/releases/latest" | jq -r '.id')
+            
+            if [ "$RELEASE_ID" = "null" ] || [ -z "$RELEASE_ID" ]; then
+              echo "Failed to get release ID, skipping upload."
+              exit 0
+            fi
           
-            # Delete the old dev-builds.txt asset
+            # Delete the old dev-builds.txt asset if it exists
             ASSET_ID=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
               "https://api.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID/assets" | \
-              jq -r '.[] | select(.name == "dev-builds.txt") | .id')
+              jq -r '.[] | select(.name == "dev-builds.txt") | .id // empty')
+            
             if [ ! -z "$ASSET_ID" ]; then
               curl -X DELETE -H "Authorization: token $GITHUB_TOKEN" \
                 "https://api.github.com/repos/${{ github.repository }}/releases/assets/$ASSET_ID"
@@ -167,59 +168,59 @@ jobs:
           path: fabric/build/libs/knockbacksync-fabric-${{ env.NEW_VERSION }}.jar
           retention-days: 90
 
-      - uses: Kir-Antipov/mc-publish@v3.3
-        with:
-          modrinth-id: ${{ vars.MODRINTH_ID  }}
-          modrinth-featured: true
-          modrinth-unfeature-mode: subset
-          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+      # - uses: Kir-Antipov/mc-publish@v3.3
+      #   with:
+      #     modrinth-id: ${{ vars.MODRINTH_ID  }}
+      #     modrinth-featured: true
+      #     modrinth-unfeature-mode: subset
+      #     modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
 
-          files: |
-            bukkit/build/libs/knockbacksync-bukkit-${{ env.NEW_VERSION }}.jar
-            bukkit/build/libs/knockbacksync-bukkit-lite-${{ env.NEW_VERSION }}.jar
+      #     files: |
+      #       bukkit/build/libs/knockbacksync-bukkit-${{ env.NEW_VERSION }}.jar
+      #       bukkit/build/libs/knockbacksync-bukkit-lite-${{ env.NEW_VERSION }}.jar
 
-          name: KnockbackSync-${{ env.NEW_VERSION }}
-          version: ${{ env.NEW_VERSION }}
-          version-type: alpha
+      #     name: KnockbackSync-${{ env.NEW_VERSION }}
+      #     version: ${{ env.NEW_VERSION }}
+      #     version-type: alpha
 
-          loaders: |
-            bukkit
-            spigot
-            paper
-            folia
-            purpur
+      #     loaders: |
+      #       bukkit
+      #       spigot
+      #       paper
+      #       folia
+      #       purpur
 
-          game-versions: |
-            >=1.12.2
+      #     game-versions: |
+      #       >=1.12.2
 
-          retry-attempts: 2
-          retry-delay: 10000
-          fail-mode: fail
+      #     retry-attempts: 2
+      #     retry-delay: 10000
+      #     fail-mode: fail
 
-      - uses: Kir-Antipov/mc-publish@v3.3
-        with:
-          modrinth-id: ${{ vars.MODRINTH_ID }}
-          modrinth-featured: true
-          modrinth-unfeature-mode: subset
-          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+      # - uses: Kir-Antipov/mc-publish@v3.3
+      #   with:
+      #     modrinth-id: ${{ vars.MODRINTH_ID }}
+      #     modrinth-featured: true
+      #     modrinth-unfeature-mode: subset
+      #     modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
 
-          files: |
-            fabric/build/libs/knockbacksync-fabric-${{ env.NEW_VERSION }}.jar
+      #     files: |
+      #       fabric/build/libs/knockbacksync-fabric-${{ env.NEW_VERSION }}.jar
 
-          name: KnockbackSync-${{ env.NEW_VERSION }}
-          version: ${{ env.NEW_VERSION }}
-          version-type: alpha
+      #     name: KnockbackSync-${{ env.NEW_VERSION }}
+      #     version: ${{ env.NEW_VERSION }}
+      #     version-type: alpha
 
-          loaders: |
-            fabric
+      #     loaders: |
+      #       fabric
 
-          game-versions: |
-            1.21.4
-            1.21.5
-            1.21.6
-            1.21.7
-            1.21.8
+      #     game-versions: |
+      #       1.21.4
+      #       1.21.5
+      #       1.21.6
+      #       1.21.7
+      #       1.21.8
 
-          retry-attempts: 2
-          retry-delay: 10000
-          fail-mode: fail
+      #     retry-attempts: 2
+      #     retry-delay: 10000
+      #     fail-mode: fail

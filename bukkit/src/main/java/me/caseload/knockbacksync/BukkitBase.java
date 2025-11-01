@@ -220,18 +220,23 @@ public class BukkitBase extends Base {
                 Field entityMapField = chunkMap.getClass().getDeclaredField("entityMap");
                 entityMapField.setAccessible(true);
                 Map<Integer, ?> entityMap = (Map<Integer, ?>) entityMapField.get(chunkMap);
-                for (Player player : Bukkit.getOnlinePlayers()) {
-                    Object trackedEntity = entityMap.get(player.getEntityId());
-                    if (trackedEntity == null)
-                        continue;
+                
+                for (Player player : world.getPlayers()) {
+                    try {
+                        Object trackedEntity = entityMap.get(player.getEntityId());
+                        if (trackedEntity == null)
+                            continue;
 
-                    Field serverEntityField = trackedEntity.getClass().getDeclaredField("serverEntity");
-                    serverEntityField.setAccessible(true);
-                    Object serverEntity = serverEntityField.get(trackedEntity);
+                        Field serverEntityField = trackedEntity.getClass().getDeclaredField("serverEntity");
+                        serverEntityField.setAccessible(true);
+                        Object serverEntity = serverEntityField.get(trackedEntity);
 
-                    Field updateIntervalField = serverEntity.getClass().getDeclaredField("updateInterval");
-                    updateIntervalField.setAccessible(true);
-                    updateIntervalField.set(serverEntity, playerUpdateInterval);
+                        Field updateIntervalField = serverEntity.getClass().getDeclaredField("updateInterval");
+                        updateIntervalField.setAccessible(true);
+                        updateIntervalField.set(serverEntity, playerUpdateInterval);
+                    } catch (ArrayIndexOutOfBoundsException e) {
+                        // Player entity not yet tracked, skip
+                    }
                 }
             }
         } catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException | NoSuchFieldException e) {

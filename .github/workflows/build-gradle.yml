@@ -10,8 +10,6 @@ on:
       - merge
       - dev
       - fabric-experimental-gradle
-      - fix-async-packet-race
-      - perf-optimize-raytrace-overhead
 
 jobs:
   build:

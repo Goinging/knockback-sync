@@ -131,37 +131,62 @@ public class PlayerData {
     }
 
     public void sendPing(boolean async) {
-        if (user == null || user.getEncoderState() != ConnectionState.PLAY) return;
+        if (user == null) return;
 
        switch (pingStrategy) {
            case KEEPALIVE:
                long keepAliveID = async ? NETTY_THREAD_TRANSACTION_ID : MAIN_THREAD_TRANSACTION_ID;
                if (async) {
-                   ChannelHelper.runInEventLoop(user.getChannel(), () -> {
-                       // We call sendPacket instead of writePacket because it flushes immediately
-                       // Making our time measurement more accurate since we don't call, System.nanoTime(), wait until flush
-                       // And then actually send packet
-                       user.sendPacket(new WrapperPlayServerKeepAlive(keepAliveID));
-                   });
+                   Channel channel = (Channel) user.getChannel();
+                   if (channel == null || !channel.isActive()) return;
+                   try {
+                       ChannelHelper.runInEventLoop(channel, () -> {
+                           if (user.getEncoderState() == ConnectionState.PLAY && channel.isActive()) {
+                               // We call sendPacket instead of writePacket because it flushes immediately
+                               // Making our time measurement more accurate since we don't call, System.nanoTime(), wait until flush
+                               // And then actually send packet
+                               user.sendPacket(new WrapperPlayServerKeepAlive(keepAliveID));
+                           }
+                       });
+                   } catch (Exception e) {
+                       e.printStackTrace();
+                   }
                } else {
-                   user.sendPacket(new WrapperPlayServerKeepAlive(keepAliveID));
+                   if (user.getEncoderState() == ConnectionState.PLAY) {
+                       user.sendPacket(new WrapperPlayServerKeepAlive(keepAliveID));
+                   }
                }
                break;
            case TRANSACTION:
-               PacketWrapper<?> packet;
                short pingTransactionID = async ? NETTY_THREAD_TRANSACTION_ID : MAIN_THREAD_TRANSACTION_ID;
-               if (PacketEvents.getAPI().getServerManager().getVersion().isNewerThanOrEquals(ServerVersion.V_1_17)) {
-                   packet = new WrapperPlayServerPing(pingTransactionID);
-               } else {
-                   packet = new WrapperPlayServerWindowConfirmation((byte) 0, pingTransactionID, false);
-               }
-
                if (async) {
-                   ChannelHelper.runInEventLoop(user.getChannel(), () -> {
-                       user.writePacket(packet);
-                   });
+                   Channel channel = (Channel) user.getChannel();
+                   if (channel == null || !channel.isActive()) return;
+                   try {
+                       ChannelHelper.runInEventLoop(channel, () -> {
+                           if (user.getEncoderState() == ConnectionState.PLAY && channel.isActive()) {
+                               PacketWrapper<?> packet;
+                               if (PacketEvents.getAPI().getServerManager().getVersion().isNewerThanOrEquals(ServerVersion.V_1_17)) {
+                                   packet = new WrapperPlayServerPing(pingTransactionID);
+                               } else {
+                                   packet = new WrapperPlayServerWindowConfirmation((byte) 0, pingTransactionID, false);
+                               }
+                               user.writePacket(packet);
+                           }
+                       });
+                   } catch (Exception e) {
+                       e.printStackTrace();
+                   }
                } else {
-                   user.writePacket(packet);
+                   if (user.getEncoderState() == ConnectionState.PLAY) {
+                       PacketWrapper<?> packet;
+                       if (PacketEvents.getAPI().getServerManager().getVersion().isNewerThanOrEquals(ServerVersion.V_1_17)) {
+                           packet = new WrapperPlayServerPing(pingTransactionID);
+                       } else {
+                           packet = new WrapperPlayServerWindowConfirmation((byte) 0, pingTransactionID, false);
+                       }
+                       user.writePacket(packet);
+                   }
                }
                break;
        }
@@ -283,13 +308,21 @@ public class PlayerData {
 
     public void updateCombat() {
         Channel channel = (Channel) user.getChannel();
-        channel.eventLoop().execute(() -> {
-            if (combatTask != null) {
-                combatTask.cancel();
-            }
-            combatTask = newCombatTask(channel);
-            CombatManager.addPlayer(user);
-        });
+        if (channel == null || !channel.isActive()) return;
+        try {
+            channel.eventLoop().execute(() -> {
+                if (!channel.isActive()) return;
+                synchronized (combatTaskLock) {
+                    if (combatTask != null) {
+                        combatTask.cancel();
+                    }
+                    combatTask = newCombatTask(channel);
+                }
+                CombatManager.addPlayer(user);
+            });
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     /**
@@ -299,15 +332,22 @@ public class PlayerData {
      */
     public void quitCombat(boolean async) {
         Channel channel = (Channel) user.getChannel();
+        if (channel == null) return;
         Runnable runnable = () -> {
-            if (combatTask != null) {
-                combatTask.cancel();
-                combatTask = null;
+            synchronized (combatTaskLock) {
+                if (combatTask != null) {
+                    combatTask.cancel();
+                    combatTask = null;
+                }
             }
             CombatManager.removePlayer(user);
         };
         if (async) {
-            channel.eventLoop().execute(runnable);
+            try {
+                channel.eventLoop().execute(runnable);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         } else {
             runnable.run();
         }

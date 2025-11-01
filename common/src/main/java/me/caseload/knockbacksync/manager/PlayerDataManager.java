@@ -17,11 +17,19 @@ public class PlayerDataManager {
 
     private static final Map<User, PlayerData> playerDataMap = new ConcurrentHashMap<>();
 
-    public static @Nullable PlayerData getPlayerData(@NotNull User user) {
+    public static @Nullable PlayerData getPlayerData(@Nullable User user) {
+        if (user == null) {
+            return null;
+        }
+
         return playerDataMap.get(user);
     }
 
-    public static void addPlayerData(@NotNull User user, @NotNull PlatformPlayer platformPlayer) {
+    public static void addPlayerData(@Nullable User user, @Nullable PlatformPlayer platformPlayer) {
+        if (user == null || platformPlayer == null) {
+            return;
+        }
+        
         if (!shouldExempt(platformPlayer.getUUID())) {
             PlayerData playerData = new PlayerData(user, platformPlayer);
             playerDataMap.put(user, playerData);
@@ -29,13 +37,21 @@ public class PlayerDataManager {
         }
     }
 
-    public static void removePlayerData(@NotNull User user) {
+    public static void removePlayerData(@Nullable User user) {
+        if (user == null) {
+            return;
+        }
+        
         PlayerData playerData = playerDataMap.remove(user);
         if (playerData != null)
             Base.INSTANCE.getEventBus().unregisterListeners(playerData);
     }
 
-    public static boolean containsPlayerData(@NotNull User user) {
+    public static boolean containsPlayerData(@Nullable User user) {
+        if (user == null) {
+            return false;
+        }
+
         return playerDataMap.containsKey(user);
     }
 

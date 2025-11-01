@@ -30,6 +30,11 @@ public class SpigotWorld implements PlatformWorld {
     private static Method vec3DAddMethod;
 
     static {
+        // Pre-warm block state mappings to avoid lazy initialization during gameplay
+        try {
+            WrappedBlockState.getByString("minecraft:stone");
+        } catch (Exception ignored) {}
+        
         if (PacketEvents.getAPI().getServerManager().getVersion().isOlderThan(ServerVersion.V_1_13)) {
             try {
                 Object server = Bukkit.getServer().getClass().getDeclaredMethod("getServer").invoke(Bukkit.getServer());

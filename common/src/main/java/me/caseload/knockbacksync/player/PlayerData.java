@@ -88,6 +88,10 @@ public class PlayerData {
     @Setter private double knockbackResistanceAttribute = 0.0;
     public PingStrategy pingStrategy; // this is currently shared between all instances, but can be made per-player later
 
+    private double cachedGroundDistance = -1;
+    private long groundCheckTime = 0;
+    private static final long CACHE_TTL_MS = 50;
+
     public PlayerData(User user, PlatformPlayer platformPlayer) {
         this.uuid = platformPlayer.getUUID();
         this.user = user;
@@ -248,6 +252,11 @@ public class PlayerData {
      * @return The distance to the ground in blocks
      */
     public double getDistanceToGround() {
+        long now = System.currentTimeMillis();
+        if (now - groundCheckTime < CACHE_TTL_MS && cachedGroundDistance >= 0) {
+            return cachedGroundDistance;
+        }
+
         double collisionDist = 5;
 
         PlatformWorld world = platformPlayer.getWorld();
@@ -261,7 +270,9 @@ public class PlayerData {
             collisionDist = Math.min(collisionDist, corner.getY() - result.getHitBlockPosition().getY());
         }
 
-        return collisionDist - 1;
+        cachedGroundDistance = collisionDist - 1;
+        groundCheckTime = now;
+        return cachedGroundDistance;
     }
 
     /**

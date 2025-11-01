@@ -99,7 +99,7 @@ public abstract class Base {
         initializeScheduler();
         configManager.loadConfig(false);
         statsManager.init();
-        checkForUpdates();
+        // checkForUpdates();
     }
 
     public abstract void initializeScheduler();
@@ -288,5 +288,3 @@ public abstract class Base {
 
     public abstract boolean hasRestartScript();
 }
-
-
